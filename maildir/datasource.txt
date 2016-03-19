@@ -1,0 +1,2 @@
+Please download the Enron Corpus (zipped 443 MB) from the link:
+https://www.cs.cmu.edu/~./enron/enron_mail_20150507.tgz
