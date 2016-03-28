@@ -1,0 +1,79 @@
+---
+title: "Enron"
+author: "Rakesh Dhote"
+date: "March 26, 2016"
+output: html_document
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load packages
+suppressMessages(library("dplyr"))
+suppressMessages(library("tidyr"))
+suppressMessages(library("ggplot2"))
+suppressMessages(library("gridExtra"))
+suppressMessages(library("GGally"))
+suppressMessages(library("knitr"))
+suppressMessages(library("RColorBrewer"))
+suppressMessages(library("reshape2"))
+suppressMessages(library("maps"))
+suppressMessages(library("maptools")) 
+suppressMessages(library("stringr"))
+suppressMessages(library("scales"))
+#suppressMessages(library("ggmap"))
+suppressMessages(library("maps"))
+
+suppressMessages(library("memisc"))
+suppressMessages(library("cowplot"))
+suppressMessages(library("zoo"))
+```
+
+```{r}
+df <- read.csv("my_dataset.csv", na.strings = c("NaN","","-", "NULL"))
+drops <- c("poiB")
+df <- df[ , !(names(df) %in% drops)]
+```
+
+```{r}
+poiNames <- df %>% 
+  filter(poi > 0) 
+
+poiNames$Name
+```
+
+```{r}
+ggplot(df, aes(salary, bonus)) + 
+  geom_point(aes(colour = factor(poi)), size = 4) +
+  geom_point(colour = "grey90", size = 2) +
+  labs(title = "Distribution of Salary and Bonuses for POIs/Non-POIs", 
+       x = "Salary (USD)", y = "Bonus (USD)") + 
+  theme_bw()
+ggsave("SalaryVsBonus.pdf")
+```
+
+```{r}
+ggplot(df, aes(salary, total_payments)) + 
+  geom_point(aes(colour = factor(poi)), size = 4) +
+  geom_point(colour = "grey90", size = 2) +
+  labs(title = "Distribution of Salary and Bonuses for POIs/Non-POIs", 
+       x = "Salary (USD)", y = "Total Payments (USD)") + 
+  theme_bw()
+ggsave("SalaryVstotalpayments.pdf")
+```
+
+
+```{r}
+ggplot(df, aes(poi, poi_ratio)) + 
+  geom_point(aes(colour = factor(poi)), size = 4) +
+  geom_point(colour = "grey90", size = 2) +
+  labs(title = "Distribution of Salary and Bonuses for POIs/Non-POIs", 
+       x = "Salary (USD)", y = "Total Payments (USD)") + 
+  theme_bw()
+ggsave("SalaryVstotalpayments.pdf")
+```
+
+
+
+
+
+
+
