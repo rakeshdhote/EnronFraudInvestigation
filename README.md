@@ -4,4 +4,4 @@ The repo consists of the files of the Capstone Course project for the `Data Anal
 
 Instructions to run the code:   
 - cd src  
-- python poi_id.py  
+- python final_poi_id.py  

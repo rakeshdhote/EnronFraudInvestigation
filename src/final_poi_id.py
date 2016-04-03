@@ -45,6 +45,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.cross_validation import StratifiedKFold
+import csv
 
 sys.path.append("../tools/")
 from feature_format import featureFormat, targetFeatureSplit
@@ -112,145 +114,6 @@ def dimensionalityReduction_PCA(clf_list):
 
     return clf_list
 
-#############################################################
-# Instantiate different classifiers under consideration
-def setupSupervisedClassifiers():
-    clf_list = []
-
-    # define classifiers and its parameters in tuples
-
-    # Decision Tree
-    clf_decisionTree = DecisionTreeClassifier()
-    param_decisionTree = {"criterion": ('gini', 'entropy'),
-                          "min_samples_split": [2, 4, 6]}
-    clf_list.append((clf_decisionTree, param_decisionTree))
-
-    # # Support vector machine
-    clf_svc = LinearSVC()
-    param_svc = {"C": [0.5, 1, 5, 10, 100, 10**10],
-                  "tol":[10**-1, 10**-10],
-                  "class_weight":['auto']}
-    clf_list.append((clf_svc,param_svc))
-
-     # adaptive boosting - adaboost
-    clf_adaboost = AdaBoostClassifier()
-    param_adaboost = {"n_estimators":[20, 25, 30, 40, 50, 100]}
-    clf_list.append((clf_adaboost,param_adaboost))
-
-     # kNN
-    clf_knn = KNeighborsClassifier()
-    param_knn = {"n_neighbors":[2, 5], "p":[2,3]}
-    clf_list.append((clf_knn,param_knn))
-
-     # Logistic Regression
-    clf_logRegression = LogisticRegression()
-    param_logRegression = {"C":[0.05, 0.5, 1, 10, 10**2,10**5,10**10, 10**20],
-                            "tol":[10**-1, 10**-5, 10**-10],
-                            "class_weight":['auto']}
-    clf_list.append((clf_logRegression,param_logRegression))
-
-     # Random RandomForestClassier
-    clf_randomForest = RandomForestClassifier( )
-    param_randomForest = {"criterion": ('gini', 'entropy')}
-    clf_list.append((clf_randomForest,param_randomForest))
-
-    return clf_list
-
-#############################################################
-def setupUnSupervisedClassifiers(features_train, labels_train):
-
-    # kMeans
-    clf_kmeans = KMeans(n_clusters=2, tol = 0.001)
-
-    pca = PCA(n_components=2, whiten=False)
-    clf_kmeans = Pipeline([("pca", pca), ("kmeans", clf_kmeans)])
-    clf_kmeans.fit( features_train )
-
-    return [clf_kmeans]
-
-#############################################################
-# optimize classifier
-def optimize_clf_list(clf_list, features_train, labels_train):
-
-    best_estimators = []
-    for clf, params in clf_list:
-        clf_optimized = optimize_clf(clf, params, features_train, labels_train)
-        best_estimators.append( clf_optimized )
-
-    return best_estimators
-
-#############################################################
-# training classifier
-def train_clf(features_train, labels_train):
-
-    clf_supervised = setupSupervisedClassifiers()
-   # clf_supervised = dimensionalityReduction_PCA(clf_supervised)
-
-    clf_supervised = optimize_clf_list(clf_supervised, features_train, labels_train)
-    clf_unsupervised = setupUnSupervisedClassifiers(features_train, labels_train)
-
-    clf_combined = clf_supervised + clf_unsupervised
-
-    return clf_combined
-
-#############################################################
-def evaluate_clf(clf, features_test, labels_test):
-    labels_pred = clf.predict(features_test)
-
-    f1 = f1_score(labels_test, labels_pred)
-    recall = recall_score(labels_test, labels_pred)
-    precision = precision_score(labels_test, labels_pred)
-    accuracy = accuracy_score(labels_test, labels_pred)
-    return f1, recall, precision,accuracy
-
-#############################################################
-def evaluate_clf_list(clf_list, features_test, labels_test):
-
-    clf_with_scores = []
-    for clf in clf_list:
-        f1, recall, precision = evaluate_clf(clf, features_test, labels_test)
-        clf_with_scores.append( (clf, f1, recall, precision,accuracy) )
-
-    return clf_with_scores
-
-#############################################################
-def optimize_clf(clf, params, features_train, labels_train, optimize=True):
-    if optimize:
-        scorer = make_scorer(f1_score)
-        clf = GridSearchCV(clf, params, scoring=scorer)
-        clf = clf.fit(features_train, labels_train)
-        clf = clf.best_estimator_
-    else:
-        clf = clf.fit(features_train, labels_train)
-
-    return clf
-
-#############################################################
-# Loop through the
-def evaluation_loop(features, labels, num_iters=1000, test_size=0.3):
-    from numpy import asarray
-
-    evaluation_matrix = [[] for n in range(7)]
-    for i in range(num_iters):
-
-        # split data in training and test set
-        features_train, features_test, labels_train, labels_test = train_test_split(features, labels, test_size=test_size)
-
-        # Train models
-        clf_list = train_clf(features_train, labels_train)
-
-        #loop through all the classifiers
-        for i, clf in enumerate(clf_list):
-            scores = evaluate_clf(clf, features_test, labels_test)
-            evaluation_matrix[i].append(scores)
-
-    summary_list = {}
-    for i, col in enumerate(evaluation_matrix):
-        summary_list[clf_list[i]] = ( sum(asarray(col)) )
-
-    ordered_list = sorted(summary_list.keys(), key = lambda k: summary_list[k][0], reverse=True)
-    return ordered_list, summary_list, evaluation_matrix
-
 #######################################
 #%%
 ### Select K best. Makes no sense to use when select k best
@@ -272,104 +135,14 @@ def kBestSelector(features, labels, features_list, k = 6):
 
     print " sum >> ", abc
     print k_best_features
-    d = k_best_features
-    from collections import OrderedDict
-    d_descending = OrderedDict(sorted(d.items(), reverse=True))
 
     features_list = ['poi'] + k_best_features.keys()
     return features_list
 
-features_list_old = features_list
-features_list = features_list_old
-features_list = kBestSelector(features, labels, features_list, k = 10)
+#features_list = kBestSelector(features, labels, features_list, k = 6)
 #%%
-#############################################################
-# Main Program
-if __name__ == '__main__':
-
-    from sklearn import cross_validation
-    from sklearn.cross_validation import StratifiedKFold
-    from sklearn.pipeline import Pipeline
-    from sklearn.grid_search import GridSearchCV
-    from sklearn.preprocessing import StandardScaler, MinMaxScaler
-    from sklearn.feature_selection import SelectKBest
-    import csv
-
-    features_label      = ["poi"]
-
-    features_email      = [
-                           "from_messages",
-                           "from_poi_to_this_person",
-                           "from_this_person_to_poi",
-                           "shared_receipt_with_poi" ,
-                           "to_messages"
-                           ]
-
-    features_finance    = [
-                            "bonus",
-                           "deferral_payments",
-                           "deferred_income",
-                           "director_fees",
-                           "exercised_stock_options",
-                           "expenses",
-                           "loan_advances",
-                           "long_term_incentive",
-                           "other",
-                           "restricted_stock",
-                           "restricted_stock_deferred",
-                           "salary",
-                           "total_payments",
-                           "total_stock_value"
-                           ]
-
-    features_engineering = ["poi_ratio",
-                            "fraction_from_poi",
-                            "fraction_to_poi"
-                            ]
-
-    # complete features list
-    features_list = features_label + features_email + features_finance + features_engineering
-
-    features_list = ["poi", "fraction_from_poi", "fraction_to_poi", 'shared_receipt_with_poi']
-#    features_list = ['poi', 'long_term_incentive', 'total_stock_value', "fraction_from_poi", "fraction_to_poi", 'shared_receipt_with_poi', 'poi_ratio']
-
-    # Load the pickeled dictionary
-    fname = "final_project_dataset.pkl"
-    data_dict = pickle.load(open(fname, "r") )
-
-    # outliers list
-    outliers_list = ['TOTAL', 'THE TRAVEL AGENCY IN THE PARK']
-
-    # cleaned data dictionary
-    data_dict = removeOutliers(data_dict,outliers_list)
-
-    # feature engineering - adding new features
-    data_dict = featureEngineering(data_dict,features_list)
-
-#    features_list = features_list_old
-    my_dataset = data_dict
-
-    data = featureFormat(my_dataset, features_list)
-
-    labels, features = targetFeatureSplit(data)
-
-    # Scale features
-    features = scaleFeatures(features)
-
-    target_names = ['non-POI', 'POI']
-
-#    features_train, features_test, labels_train, labels_test =  cross_validation.train_test_split(features, labels, test_size = 0.4, random_state = 42)
-
-
-
-    # intialize to zero
-#    results_acc = np.array([])
-#    results_precision = np.array([])
-#    results_recall = np.array([])
-#    results_f1 = np.array([])
-
-##########################
-kBest = [1, 3, 5, 8]
+def defineClassifiers():
+    kBest = [1, 3, 5, 8]
 
     # Decision Tree
     pipeline_DT = Pipeline([ # ('sel', SelectKBest()),
@@ -411,7 +184,9 @@ kBest = [1, 3, 5, 8]
                          ])
 
     param_grid_AdaB = [{ # 'sel__k': kBest,
-                   'clf__n_estimators': [1, 3, 5, 10, 25, 30, 40, 50, 100]
+                   'clf__n_estimators': [1, 3, 5, 10, 25, 30, 40, 50, 100] #,
+#                    'clf__learning_rate': [0.1, 0.5, 1, 1.5, 2, 2.5]
+                  # 'clf__base_estimator':[DecisionTreeClassifier()]
                    }]
 
 ##########################
@@ -447,17 +222,100 @@ kBest = [1, 3, 5, 8]
                    }]
 
 ##########################
+    # Gradient Boost
+    pipeline_GB = Pipeline([ #  ('sel', SelectKBest()),
+                         ('clf', GradientBoostingClassifier())
+                         ])
 
-    pipeline_clf = [pipeline_DT, pipeline_SVM, pipeline_LR, pipeline_AdaB, pipeline_RF, pipeline_kNN, pipeline_NB]
+    param_grid_GB = [{ #  'sel__k': kBest,
+                   'clf__max_depth': [2, 3, 5],
+                    'clf__n_estimators': [5, 10, 20, 50]
+                    }]
 
-    pipeline_params = [param_grid_DT, param_grid_SVM, param_grid_LR, param_grid_AdaB, param_grid_RF, param_grid_kNN, param_grid_NB]
+##########################
+
+    pipeline_clf = [pipeline_DT, pipeline_SVM, pipeline_LR, pipeline_AdaB, pipeline_RF, pipeline_kNN, pipeline_NB, pipeline_GB]
+
+    pipeline_params = [param_grid_DT, param_grid_SVM, param_grid_LR, param_grid_AdaB, param_grid_RF, param_grid_kNN, param_grid_NB, param_grid_GB]
 
 
-    clfNames = ['Decision Tree', 'Support Vector Machine', 'Logistic Regression','Adaptive Boost', 'Random Forest', 'k Nearest Neighbor', 'Naive Bayes']
+    clfNames = ['Decision Tree', 'Support Vector Machine', 'Logistic Regression','Adaptive Boost', 'Random Forest', 'k Nearest Neighbor', 'Naive Bayes', 'Gradient Boost']
+
+    return pipeline_clf, pipeline_params, clfNames
+#%%
+#############################################################
+# Main Program
+if __name__ == '__main__':
+
+    # define features
+    features_label      = ["poi"]
+
+    features_email      = [
+                           "from_messages",
+                           "from_poi_to_this_person",
+                           "from_this_person_to_poi",
+                           "shared_receipt_with_poi" ,
+                           "to_messages"
+                           ]
+
+    features_finance    = [
+                            "bonus",
+                           "deferral_payments",
+                           "deferred_income",
+                           "director_fees",
+                           "exercised_stock_options",
+                           "expenses",
+                           "loan_advances",
+                           "long_term_incentive",
+                           "other",
+                           "restricted_stock",
+                           "restricted_stock_deferred",
+                           "salary",
+                           "total_payments",
+                           "total_stock_value"
+                           ]
+
+    features_engineering = ["poi_ratio",
+                            "fraction_from_poi",
+                            "fraction_to_poi"
+                            ]
+
+    # complete features list
+    features_list = features_label + features_email + features_finance + features_engineering
+    features_list = ["poi", "fraction_from_poi", "fraction_to_poi", 'shared_receipt_with_poi']
+
+
+    # Load the pickeled dictionary
+    fname = "final_project_dataset.pkl"
+    data_dict = pickle.load(open(fname, "r") )
+
+    # outliers list
+    outliers_list = ['TOTAL', 'THE TRAVEL AGENCY IN THE PARK']
+
+    # cleaned data dictionary
+    data_dict = removeOutliers(data_dict,outliers_list)
+
+    # feature engineering - adding new features
+    data_dict = featureEngineering(data_dict,features_list)
+
+#    features_list = features_list_old
+    my_dataset = data_dict
+    data = featureFormat(my_dataset, features_list)
+
+    # Extract features and labels
+    labels, features = targetFeatureSplit(data)
+
+    # Scale features
+    features = scaleFeatures(features)
+
+    target_names = ['non-POI', 'POI']
+
+    # Define different classifiers
+    pipeline_clf, pipeline_params, clfNames = defineClassifiers()
 
     lisname = ['Classifier','Precision','Recall','F1','Accuracy']
 
-    start = time.time()
+    start = time.time() # start timer
 
     scoring_index = 'precision' # precision  recall  roc_auc
 
@@ -469,7 +327,8 @@ kBest = [1, 3, 5, 8]
         wr = csv.writer(myfile)
         wr.writerow(lisname)
         for pipeline, param_grid, clfNames in zip(pipeline_clf,pipeline_params,clfNames):
-                # intialize to zero
+
+            # intialize scores to zero
             results_acc = np.array([])
             results_precision = np.array([])
             results_recall = np.array([])
@@ -494,23 +353,11 @@ kBest = [1, 3, 5, 8]
                 print 'Best score >>> ', grid_search.best_score_
                 print 'Best scorer >>> ', grid_search.scorer_
                 print 'Best best parameters >>> ', grid_search.best_params_
-        #        print 'Best grid scores >>> ', grid_search.grid_scores_
-
-#                report = classification_report(labels_test,pred, target_names=target_names)
-        #        print ' best score ', clf.best_score_
-    #            print "Classification Report >>> \n", report
-    #
-    #            print 'accuracy = ', accuracy_score(labels_test,pred)
-    #            print 'precision = ', precision_score(labels_test,pred)
-    #            print 'recall = ', recall_score(labels_test,pred)
-    #            print 'F1 = ', f1_score(labels_test,pred)
-
 
                 results_acc = np.append(results_acc, [accuracy_score(labels_test,pred)], axis=0)
                 results_precision = np.append(results_precision, [precision_score(labels_test,pred)], axis=0)
                 results_recall = np.append(results_recall, [recall_score(labels_test,pred)], axis=0)
                 results_f1 = np.append(results_f1, [f1_score(labels_test,pred)], axis=0)
-
 
             print '>>>>>>>>>>', clfNames
             print "avg precision : ", np.array(results_precision).mean()
@@ -524,11 +371,11 @@ kBest = [1, 3, 5, 8]
             line.append(np.array(results_recall).mean())
             line.append(np.array(results_f1).mean())
             line.append(np.array(results_acc).mean())
-#            print line
 
             wr.writerow(line)
             print "="*50
 
     end = time.time()
-    print 'Time elapsed = ', (end - start)/60, ' mins'
 
+    print 'Time elapsed = ', (end - start)/60, ' mins'
+    print " >>>>>>> DONE <<<<<<<<"
